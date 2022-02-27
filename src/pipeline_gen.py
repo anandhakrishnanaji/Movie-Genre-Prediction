@@ -1,14 +1,13 @@
 import re
+import io
 import string
 
 import config
 
-import pandas as pd
-
 import numpy as np
 
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer,ENGLISH_STOP_WORDS
+from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer
 from sklearn.base import BaseEstimator,TransformerMixin
 
 from nltk.tokenize import word_tokenize
@@ -16,26 +15,7 @@ from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer 
 from nltk.corpus import stopwords
 
-from gensim.models import word2vec,fasttext
-
-def sentence2vec(s,embedding_dict):
-    words=word_tokenize(s)
-    words=[w for w in words if w.isalpha()]
-
-    M=[]
-
-    for w in words:
-        if w in embedding_dict:
-            M.append(embedding_dict[w])
-
-    if len(M)==0:
-        return np.zeros(300)
-
-    M=np.array(M)
-
-    v= M.sum(axis=0)
-
-    return v/np.sqrt((v**2).sum())
+# from gensim.models import word2vec,fasttext
 
 class CleanData(BaseEstimator,TransformerMixin):
     def _clean(self,s):
@@ -84,12 +64,56 @@ class StopWordsRemoval(BaseEstimator,TransformerMixin):
     def transform(self,X,y):
         return X.apply(lambda s: self._removeStopWords(s))
 
+class FastTextVectorizer(BaseEstimator,TransformerMixin):
+    def _sentence2vec(self,s):
+        words=word_tokenize(s)
+        words=[w for w in words if w.isalpha()]
 
-vectorize={'tfidf':TfidfVectorizer(),'countvec':CountVectorizer()}
+        M=[]
+
+        for w in words:
+            if w in self.embedding_dict:
+                M.append(self.embedding_dict[w])
+
+        if len(M)==0:
+            return np.zeros(300)
+
+        M=np.array(M)
+
+        v= M.sum(axis=0)
+
+        return v/np.sqrt((v**2).sum())
+
+    def _load_vector(self):
+        fin=io.open(config.VECTOR_FILE,'r',encoding='utf-8',newline='\n',errors='ignore')
+        n,d=map(int,fin.readline().split())
+        data={}
+        for line in fin:
+            tokens=line.rstrip().split(' ')
+            data[tokens[0]]=list(map(float,tokens[1:]))
+        return data
+
+    def __init__(self):
+        self.embedding_dict=self._load_vector()
+    
+    def fit(self,X,y=None):
+        return self
+    
+    def transform(self,X):
+        X=X.apply(lambda s: self._sentence2vec(s))
+        return X
 
 
-def create_pipeline(*args,**kwargs):
-    pass
 
-print(len(ENGLISH_STOP_WORDS))
-# print(len(stopwords.words("english")))
+
+options={'tfidf':TfidfVectorizer(),'countvec':CountVectorizer()}
+
+
+def create_pipeline(model,stopwords=False,lemmatize=False,embedding='tfidf'):
+    transformers=[('clean',CleanData())]
+    if stopwords:
+        transformers.append(('stopwords',StopWordsRemoval()))
+    transformers.append(('stem',StemLemmatizeData(lemmatize=lemmatize)))
+    transformers.append(('embed',options[embedding]))
+    transformers.append(('model',model))
+    return Pipeline(transformers)
