@@ -36,20 +36,21 @@ class StemLemmatizeData(BaseEstimator,TransformerMixin):
         self._lemmatizer=WordNetLemmatizer()
 
     def _stem(self,s):
-        return [self._stemmer.stem(x) for x in s.split()].join(' ')
+        return ' '.join([self._stemmer.stem(x) for x in s.split()])
     
     def _lemma(self,s):
-        return (' ').join([self._lemmatizer.lemmatize(x) for x in s.split()])
+        return ' '.join([self._lemmatizer.lemmatize(x) for x in s.split()])
     
     def fit(self,X,y=None):
         return self
     
     def transform(self,X):
-        print('DATA STEMMING/LEMMATIZING...')
         if self._lemmatize:
-            return X.apply(lambda s: self._lemma(s))
+            X=X.apply(lambda s: self._lemma(s))
         else:
-            return X.apply(lambda s: self._stem(s))
+            X=X.apply(lambda s: self._stem(s))
+        print('DATA STEMMED/LEMMATIZED...')
+        return X
 
 class StopWordsRemoval(BaseEstimator,TransformerMixin):
     def _removeStopWords(self,s):
@@ -111,7 +112,8 @@ class FastTextVectorizer(BaseEstimator,TransformerMixin):
 
 
 
-options={'tfidf':TfidfVectorizer(),'countvec':CountVectorizer()}
+options={'tfidf':TfidfVectorizer(tokenizer=word_tokenize,token_pattern=None),
+'countvec':CountVectorizer(tokenizer=word_tokenize,token_pattern=None)}
 
 
 def create_pipeline(model,stopwords=False,lemmatize=False,embedding='tfidf'):
