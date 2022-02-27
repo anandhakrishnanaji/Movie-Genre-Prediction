@@ -26,6 +26,7 @@ class CleanData(BaseEstimator,TransformerMixin):
     
     def transform(self,X):
         X=X.apply(lambda s:self._clean(s))
+        print('DATA CLEANED...')
         return X
 
 class StemLemmatizeData(BaseEstimator,TransformerMixin):
@@ -44,6 +45,7 @@ class StemLemmatizeData(BaseEstimator,TransformerMixin):
         return self
     
     def transform(self,X):
+        print('DATA STEMMING/LEMMATIZING...')
         if self._lemmatize:
             return X.apply(lambda s: self._lemma(s))
         else:
@@ -62,6 +64,7 @@ class StopWordsRemoval(BaseEstimator,TransformerMixin):
         return self
     
     def transform(self,X,y):
+        print('REMOVING STOPWORDS...')
         return X.apply(lambda s: self._removeStopWords(s))
 
 class FastTextVectorizer(BaseEstimator,TransformerMixin):
@@ -95,12 +98,14 @@ class FastTextVectorizer(BaseEstimator,TransformerMixin):
 
     def __init__(self):
         self.embedding_dict=self._load_vector()
+        print('VECTOR LOADED...')
     
     def fit(self,X,y=None):
         return self
     
     def transform(self,X):
         X=X.apply(lambda s: self._sentence2vec(s))
+        print('WORD EMBEDDINGS APPLIED...')
         return X
 
 
@@ -110,6 +115,9 @@ options={'tfidf':TfidfVectorizer(),'countvec':CountVectorizer()}
 
 
 def create_pipeline(model,stopwords=False,lemmatize=False,embedding='tfidf'):
+
+    print('CREATING PIPELINE...')
+
     transformers=[('clean',CleanData())]
     if stopwords:
         transformers.append(('stopwords',StopWordsRemoval()))
