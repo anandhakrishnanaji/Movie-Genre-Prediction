@@ -52,21 +52,38 @@ class StemLemmatizeData(BaseEstimator,TransformerMixin):
         print('DATA STEMMED/LEMMATIZED...')
         return X
 
+    def get_params(self,deep=False):
+        return {'lemmatize':self._lemmatize}
+    
+    def set_params(self,**parameters):
+        self._lemmatize=parameters['lemmatize']
+        return self
+
 class StopWordsRemoval(BaseEstimator,TransformerMixin):
     def _removeStopWords(self,s):
         tokens=word_tokenize(s)
         filtered_sentence = [w for w in tokens if not w.lower() in self._swords]
         return ' '.join(filtered_sentence)
 
-    def __init__(self):
+    def __init__(self,remove=False):
         self._swords=stopwords.words('english')
+        self._remove=remove
 
     def fit(self,X,y):
         return self
     
-    def transform(self,X,y):
+    def transform(self,X):
         print('REMOVING STOPWORDS...')
-        return X.apply(lambda s: self._removeStopWords(s))
+        if self._remove:
+            return X.apply(lambda s: self._removeStopWords(s))
+        return X
+
+    def get_params(self,deep=False):
+        return {"remove":self._remove}
+    
+    def set_params(self,**parameters):
+        self._remove=parameters["remove"]
+        return self
 
 class FastTextVectorizer(BaseEstimator,TransformerMixin):
     def _sentence2vec(self,s):
@@ -109,21 +126,42 @@ class FastTextVectorizer(BaseEstimator,TransformerMixin):
         print('WORD EMBEDDINGS APPLIED...')
         return X
 
+class Vectorizer(BaseEstimator,TransformerMixin):
+    def __init__(self,option='countvec',ngram_range=(1,1)):
+        self._option=option
+        self._ngram_range=ngram_range
+    
+    def fit(self,X,y=None):
+        # print(self._option)
+        if(self._option=='countvec'):
+            self._model=CountVectorizer(ngram_range=self._ngram_range,tokenizer=word_tokenize,token_pattern=None).fit(X)
+        elif(self._option=='tfidf'):
+            self._model=TfidfVectorizer(ngram_range=self._ngram_range,tokenizer=word_tokenize,token_pattern=None).fit(X)
+        else:
+            self._model=FastTextVectorizer().fit(X)
+        return self
+    
+    def transform(self,X):
+        print("TRANSFORMING TO VECTOR")
+        return self._model.transform(X)
+    
+    def get_params(self,deep=False):
+        return {'option':self._option,'ngram_range':self._ngram_range}
+    
+    def set_params(self,**parameters):
+        self._option=parameters['option']
+        self._ngram_range=parameters['ngram_range']
+        return self
+        
 
-
-
-options={'tfidf':TfidfVectorizer(tokenizer=word_tokenize,token_pattern=None),
-'countvec':CountVectorizer(tokenizer=word_tokenize,token_pattern=None)}
-
-
-def create_pipeline(model,stopwords=False,lemmatize=False,embedding='tfidf'):
+def create_pipeline(model,stopwords=False,lemmatize=False,embedding='countvec'):
 
     print('CREATING PIPELINE...')
 
-    transformers=[('clean',CleanData())]
-    if stopwords:
-        transformers.append(('stopwords',StopWordsRemoval()))
-    transformers.append(('stem',StemLemmatizeData(lemmatize=lemmatize)))
-    transformers.append(('embed',options[embedding]))
-    transformers.append(('model',model))
+    transformers=[('clean',CleanData()),
+                ('stopwords',StopWordsRemoval(remove=stopwords)),
+                ('stem',StemLemmatizeData(lemmatize=lemmatize)),
+                ('embed',Vectorizer(option=embedding)),
+                ('model',model)]
+
     return Pipeline(transformers)

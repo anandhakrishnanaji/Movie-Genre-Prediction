@@ -1,5 +1,4 @@
-from locale import normalize
-
+from xgboost import train
 import config
 import pipeline_gen
 
@@ -7,18 +6,21 @@ import pandas as pd
 
 import numpy as np
 
-from sklearn import linear_model,metrics,multiclass,naive_bayes
+from sklearn import linear_model,metrics,multiclass
 
-measures_array=[]
+THRESHOLD=0.4
 
-# def aggregate_scores():
-#     aggr=measures_array[0]
-#     for dic in range(1,4):
-#         for key in measures_array[dic]:
-#             aggr[key]+=measures_array[dic][key]
-#     for key in aggr:
-#         aggr[key]/=4
-#     return aggr
+test_scores_array=[]
+train_scores_array=[]
+
+def aggregate_scores(arr):
+    aggr=arr[0]
+    for dic in range(1,4):
+        for key in arr[dic]:
+            aggr[key]+=arr[dic][key]
+    for key in aggr:
+        aggr[key]/=4
+    return aggr
 
 def get_accuracies(pred,true):
     measures=dict()
@@ -35,8 +37,6 @@ def get_accuracies(pred,true):
     measures['Hamming Loss']=metrics.hamming_loss(true,pred)
     measures['Zero One Loss']=metrics.zero_one_loss(true,pred)
 
-
-    measures_array.append(measures)
     return measures
 
 def print_measures(measures):
@@ -60,7 +60,7 @@ for fold in range(4):
     y_train=train_data.iloc[:,1:-1]
     y_test=test_data.iloc[:,1:-1]
 
-    model=multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=1,n_jobs=-1,max_iter=1000),n_jobs=-1)
+    model=multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=1,n_jobs=-1,max_iter=2000,solver='liblinear'),n_jobs=-1)
 
     print('MODEL DEFINED...')
 
@@ -74,11 +74,11 @@ for fold in range(4):
     y_pred_train=pipeline.predict_proba(X_train)
     y_pred_test=pipeline.predict_proba(X_test)
 
-    y_pred_train[y_pred_train<0.4]=0
-    y_pred_train[y_pred_train>=0.4]=1
+    y_pred_train[y_pred_train<THRESHOLD]=0
+    y_pred_train[y_pred_train>=THRESHOLD]=1
 
-    y_pred_test[y_pred_test<0.4]=0
-    y_pred_test[y_pred_test>=0.4]=1
+    y_pred_test[y_pred_test<THRESHOLD]=0
+    y_pred_test[y_pred_test>=THRESHOLD]=1
 
     ##
     # thresh=numpy.linspace(0.3,0.8,11)
@@ -98,19 +98,25 @@ for fold in range(4):
     measures_train=get_accuracies(y_pred_train,y_train)
     measures_test=get_accuracies(y_pred_test,y_test)
 
+    train_scores_array.append(measures_train)
+    test_scores_array.append(measures_test)
+
     # print('TRAIN SCORE (FOLD {})'.format(fold),end='\n\n')
     # print_measures(measures_train)
 
     # print('TEST SCORE (FOLD {})'.format(fold),end='\n\n')
     # print_measures(measures_test)
 
-    movie_name='Happy Husbands'
-    pred_proba=pipeline.predict_proba(pd.Series([movie_name,])).flatten()
-    predicted_genres=genres[pred_proba>0.4]
+    # movie_name='Happy Husbands'
+    # pred_proba=pipeline.predict_proba(pd.Series([movie_name,])).flatten()
+    # predicted_genres=genres[pred_proba>0.4]
 
-    print(movie_name,predicted_genres)
+    # print(movie_name,predicted_genres)
 
 
-# print('MEAN SCORES')
-# print_measures(aggregate_scores())
+print('\nLOGISTIC REGRESSION\n')
+print('\nMEAN TRAIN SCORES')
+print_measures(aggregate_scores(train_scores_array))
 
+print('\nMEAN TEST SCORES')
+print_measures(aggregate_scores(test_scores_array))
